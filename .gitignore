@@ -1,0 +1,111 @@
+# Nix build outputs
+result
+result-*
+*.drv
+
+# Nix evaluation/build artifacts
+.direnv/
+.envrc.local
+
+# Secrets / local keys
+*.agekey
+*.key
+*.pem
+*.p12
+*.pfx
+*.gpg
+*.asc
+*.kdbx
+
+# SOPS local files / decrypted material
+.sops.yaml.local
+secrets/*.decrypted.*
+secrets/**/*.decrypted.*
+secrets/**/*.plain.*
+secrets/**/*.tmp
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# SSH
+.ssh/
+known_hosts
+authorized_keys
+
+# GPG
+.gnupg/
+
+# Vault
+.vault-token
+vault-token
+*.vault-token
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Ansible
+*.retry
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+.pnpm-store/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Rust
+target/
+
+# Go
+bin/
+
+# VS Code
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# JetBrains
+.idea/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+*.bak
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+.cache/
+
+# Local machine-specific overrides
+local.nix
+hardware-local.nix
+*.local.nix
+
+# Generated hardware backups
+hardware-configuration.nix.bak
