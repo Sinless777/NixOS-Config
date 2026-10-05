@@ -7,6 +7,28 @@
 
 let
   cuda = pkgs.cudaPackages_12;
+  cudaSamples = cuda.cuda-samples.overrideAttrs (old: {
+    # Install the basic GPU validation tools rather than the full demo suite.
+    buildPhase = ''
+      runHook preBuild
+      cmake --build . --parallel "$NIX_BUILD_CORES" \
+        --target deviceQuery bandwidthTest vectorAdd
+      runHook postBuild
+    '';
+    installPhase = ''
+      runHook preInstall
+      install -Dm755 Samples/1_Utilities/deviceQuery/deviceQuery "$out/bin/deviceQuery"
+      install -Dm755 Samples/1_Utilities/bandwidthTest/bandwidthTest "$out/bin/bandwidthTest"
+      install -Dm755 Samples/0_Introduction/vectorAdd/vectorAdd "$out/bin/vectorAdd"
+      runHook postInstall
+    '';
+    # FindCUDAToolkit assumes a single toolkit directory, while Nix splits
+    # these libraries into separate outputs.
+    cmakeFlags = (old.cmakeFlags or [ ]) ++ [
+      (lib.cmakeFeature "CUDA_nvrtc_LIBRARY" "${lib.getLib cuda.cuda_nvrtc}/lib/libnvrtc.so")
+      (lib.cmakeFeature "CUDA_curand_LIBRARY" "${lib.getLib cuda.libcurand}/lib/libcurand.so")
+    ];
+  });
   nsightSystems = cuda.nsight_systems.overrideAttrs (old: {
     # This release ships an empty libqtiff.so placeholder. Qt image plugins
     # are supplied by the package's Qt dependencies; only patch real ELF files.
@@ -27,8 +49,8 @@ in
   ];
 
   hardware.nvidia = {
-    # GTX 1080 / Pascal should use the proprietary kernel module.
-    open = false;
+    # RTX 3060 / Ampere supports NVIDIA's open kernel module.
+    open = true;
 
     # NVIDIA settings GUI.
     nvidiaSettings = true;
@@ -39,9 +61,7 @@ in
     # Useful on a workstation that may run CUDA jobs and graphical workloads.
     powerManagement.enable = true;
 
-    # GTX 10-series cards are currently handled by the legacy 580 branch
-    # in nixpkgs.
-    package = config.boot.kernelPackages.nvidiaPackages.legacy_580;
+    package = config.boot.kernelPackages.nvidiaPackages.stable;
   };
 
   # ---------------------------------------------------------------------------
@@ -60,13 +80,11 @@ in
   # ---------------------------------------------------------------------------
 
   nixpkgs.config = {
-    # Enable CUDA per package: global support pulls in cuDNN builds that
-    # no longer support this Pascal GPU.
-    cudaSupport = false;
+    cudaSupport = true;
 
-    # Pascal / GTX 1080 compute capability.
+    # RTX 3060 / Ampere compute capability.
     cudaCapabilities = [
-      "6.1"
+      "8.6"
     ];
 
     cudaForwardCompat = true;
@@ -102,8 +120,8 @@ in
     # Useful for build systems such as CMake.
     CUDA_ROOT = "${cuda.cuda_nvcc}";
 
-    # Default architecture for this GTX 1080.
-    CUDAARCHS = "61";
+    # Default architecture for this RTX 3060.
+    CUDAARCHS = "86";
   };
 
   # ---------------------------------------------------------------------------
@@ -115,7 +133,7 @@ in
     # Driver / management utilities
     # -------------------------------------------------------------------------
 
-    config.boot.kernelPackages.nvidiaPackages.legacy_580
+    config.hardware.nvidia.package
 
     # -------------------------------------------------------------------------
     # CUDA compiler and development tooling
@@ -169,7 +187,7 @@ in
     # Deep learning
     # -------------------------------------------------------------------------
 
-    # Current cuDNN requires compute capability 7.5+, beyond Pascal's 6.1.
+    cuda.cudnn
     cuda.nccl
 
     # -------------------------------------------------------------------------
@@ -196,7 +214,7 @@ in
     # CUDA demos / validation
     # -------------------------------------------------------------------------
 
-    cuda.cuda-samples
+    cudaSamples
 
     # -------------------------------------------------------------------------
     # Build / native development requirements
@@ -238,8 +256,9 @@ in
         cuda.libcusparse
         cuda.cuda_nvrtc
         cuda.cuda_cupti
+        cuda.cudnn
         cuda.nccl
-        config.boot.kernelPackages.nvidiaPackages.legacy_580
+        config.hardware.nvidia.package
       ])
     ];
   };

@@ -40,9 +40,10 @@
     min-free = 5 * 1024 * 1024 * 1024;
     max-free = 20 * 1024 * 1024 * 1024;
 
-    # Reasonable parallelism for the Threadripper system.
-    max-jobs = "auto";
-    cores = 0;
+    # Each concurrent build gets its own core budget; these limits multiply.
+    # Leave resources available for the desktop during large C++/CUDA builds.
+    max-jobs = 1;
+    cores = 4;
 
     # More readable command output.
     warn-dirty = true;
@@ -85,7 +86,56 @@
   };
 
   nixpkgs.overlays = [
-    (_final: prev: {
+    (final: prev: {
+      ceph = prev.ceph.overrideAttrs (old: {
+        # GCC 16 no longer provides uint64_t through unrelated STL headers.
+        postPatch = (old.postPatch or "") + ''
+          substituteInPlace src/common/Formatter.h \
+            --replace-fail '#include <map>' $'#include <map>\n#include <cstdint>'
+          # Argument-dependent lookup also finds crimson::make_message.
+          # The MDS server needs the ceph intrusive-pointer factory.
+          substituteInPlace src/mds/Server.cc \
+            --replace-fail 'make_message<MClientReply>' 'ceph::make_message<MClientReply>'
+        '';
+      });
+      # Keep ONNX Runtime's CUDA backend without the optional multi-gigabyte
+      # TensorRT distribution downloaded from NVIDIA.
+      onnxruntime = prev.onnxruntime.override { tensorrtSupport = false; };
+      suitesparse = prev.suitesparse.overrideAttrs (old: {
+        # CUDA libraries have separate Nix outputs, outside nvcc's toolkit root.
+        cmakeFlags = (old.cmakeFlags or [ ]) ++ [
+          (lib.cmakeFeature "CUDA_nvrtc_LIBRARY" "${lib.getLib final.cudaPackages.cuda_nvrtc}/lib/libnvrtc.so")
+        ];
+      });
+      cudaPackages_12 = prev.cudaPackages_12.overrideScope (
+        _cudaFinal: cudaPrev: {
+          libnvshmem = cudaPrev.libnvshmem.overrideAttrs (old: {
+            # NVRTC headers also live outside nvcc's toolkit include directory.
+            buildInputs = (old.buildInputs or [ ]) ++ [
+              (lib.getOutput "include" cudaPrev.cuda_nvrtc)
+            ];
+            # FindCUDAToolkit cannot discover NVRTC in its separate Nix output.
+            # NVSHMEM's test helpers link the CUDA::nvrtc imported target.
+            cmakeFlags = (old.cmakeFlags or [ ]) ++ [
+              (lib.cmakeFeature "CUDA_nvrtc_LIBRARY" "${lib.getLib cudaPrev.cuda_nvrtc}/lib/libnvrtc.so")
+            ];
+          });
+          # Consumers such as ONNX Runtime need this header-only library, not
+          # the bundled GPU example/test binaries with broken NVRTC discovery.
+          cudnn-frontend = cudaPrev.cudnn-frontend.override {
+            withSamples = false;
+            withTests = false;
+          };
+        }
+      );
+      lazarus-qt6 = prev.lazarus-qt6.overrideAttrs (old: {
+        # Removing rpath flags leaves extra spaces, rejected by makeWrapper.
+        postInstall =
+          builtins.replaceStrings
+            [ "sed -re 's/-rpath [^ ]+//g'" ]
+            [ "sed -re 's/-rpath [^ ]+//g; s/^ +//; s/ +$//; s/ +/ /g'" ]
+            old.postInstall;
+      });
       ltrace = prev.ltrace.overrideAttrs (old: {
         # GCC warns about volatile return types; ltrace's DejaGNU harness
         # treats compiler output as failure and never creates the test binary.

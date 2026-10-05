@@ -72,7 +72,7 @@
   services.ollama = {
     enable = true;
 
-    # Pascal requires CUDA 12; CUDA 13 drops support for compute capability 6.1.
+    # Use the same CUDA 12 toolkit as the workstation development environment.
     package = pkgs.ollama-cuda.override { cudaPackages = pkgs.cudaPackages_12; };
 
     # Keep Ollama available locally rather than exposing it to the LAN.

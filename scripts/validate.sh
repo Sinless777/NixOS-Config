@@ -20,7 +20,7 @@ set -Eeuo pipefail
 #   6. nix flake check
 #   7. NixOS configuration evaluation
 #   8. Home Manager configuration evaluation
-#   9. Full NixOS build
+#   9. Optional full NixOS build (--build)
 # =====================================================================
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,6 +28,30 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
 HOST="${HOST:-desktop}"
 USER_NAME="${USER_NAME:-sinless777}"
+
+BUILD=0
+BUILD_MAX_JOBS="${BUILD_MAX_JOBS:-1}"
+BUILD_CORES="${BUILD_CORES:-4}"
+while (( $# > 0 )); do
+  case "$1" in
+    --build) BUILD=1 ;;
+    -h|--help)
+      printf 'Usage: ./scripts/validate.sh [--build]\n\n'
+      printf 'Default: syntax, formatting, and evaluation checks.\n'
+      printf '%s\n' '--build: also build the full system without activation.'
+      printf 'Build limits: BUILD_MAX_JOBS=1, BUILD_CORES=4 (positive integers).\n'
+      exit 0
+      ;;
+    *) printf 'Unknown argument: %s (use --help)\n' "$1" >&2; exit 1 ;;
+  esac
+  shift
+done
+for value in "$BUILD_MAX_JOBS" "$BUILD_CORES"; do
+  [[ "$value" =~ ^[1-9][0-9]*$ ]] || {
+    printf 'BUILD_MAX_JOBS and BUILD_CORES must be positive integers\n' >&2
+    exit 1
+  }
+done
 
 FLAKE_PATH="path:${REPO_ROOT}"
 FLAKE_REF="${FLAKE_PATH}#nixosConfigurations.${HOST}"
@@ -235,7 +259,8 @@ else
   info "Loading the formatter from the flake"
   nix_system="$(nix --extra-experimental-features 'nix-command flakes' eval --impure --raw --expr builtins.currentSystem)"
   formatter_path="$(nix --extra-experimental-features 'nix-command flakes' build \
-    "${FLAKE_PATH}#formatter.${nix_system}" --no-link --no-write-lock-file --print-out-paths)"
+    "${FLAKE_PATH}#formatter.${nix_system}" --no-link --no-write-lock-file --print-out-paths \
+    --max-jobs "${BUILD_MAX_JOBS}" --cores "${BUILD_CORES}")"
   NIXFMT="${formatter_path}/bin/nixfmt"
 fi
 
@@ -364,17 +389,23 @@ CURRENT_STAGE="full NixOS build"
 
 section "9. Full system build"
 
-info "Building host without activating it"
+if (( BUILD )); then
+  info "Building host without activating it (max-jobs=${BUILD_MAX_JOBS}, cores=${BUILD_CORES})"
 
-run nix \
-  --extra-experimental-features "nix-command flakes" \
-  build \
-  "${FLAKE_REF}.config.system.build.toplevel" \
-  --show-trace \
-  --print-build-logs \
-  --no-link
+  run nix \
+    --extra-experimental-features "nix-command flakes" \
+    build \
+    "${FLAKE_REF}.config.system.build.toplevel" \
+    --show-trace \
+    --no-write-lock-file \
+    --max-jobs "${BUILD_MAX_JOBS}" \
+    --cores "${BUILD_CORES}" \
+    --no-link
 
-success "Full NixOS system builds successfully"
+  success "Full NixOS system builds successfully"
+else
+  info "Skipped full system build; use --build to include it"
+fi
 
 # =====================================================================
 # Complete
@@ -394,4 +425,8 @@ printf '  Nix files    : %s\n' "${#nix_files[@]}"
 printf '  Flake        : passed\n'
 printf '  NixOS eval   : passed\n'
 printf '  Home Manager : passed\n'
-printf '  System build : passed\n'
+if (( BUILD )); then
+  printf '  System build : passed\n'
+else
+  printf '  System build : skipped (use --build)\n'
+fi

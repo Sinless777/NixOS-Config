@@ -243,7 +243,7 @@ Approximately:
 
 ## GPU
 
-NVIDIA GeForce GTX 1080-class GPU.
+NVIDIA GeForce RTX 3060 GPU.
 
 The NixOS configuration will use the proprietary NVIDIA driver rather than Nouveau.
 
@@ -662,6 +662,26 @@ This is preferred when making significant changes.
 ---
 
 # Apply Desktop Configuration
+
+The apply script switches the desktop configuration, including Home Manager:
+
+```bash
+./scripts/apply.sh
+```
+
+Run `./scripts/validate.sh` for syntax, formatting, and evaluation checks.
+Use `./scripts/validate.sh --build` to also build without activation. Validation
+builds default to one job with four cores; override with positive integer
+`BUILD_MAX_JOBS` and `BUILD_CORES` environment variables. Large CUDA/C++ builds
+can still require substantial memory and time. The configured Nix daemon limits
+take effect after applying the configuration; the validator passes its limits
+immediately.
+
+Use `./scripts/apply.sh test` to activate temporarily, `boot` to apply at the
+next boot, or `build` to build without activating. Select a configured host with
+`--host HOST`, and preview the command with `--dry-run`.
+
+Equivalent direct command:
 
 ```bash
 sudo nixos-rebuild switch --flake .#desktop
