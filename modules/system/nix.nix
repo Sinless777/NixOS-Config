@@ -93,9 +93,11 @@
           substituteInPlace src/common/Formatter.h \
             --replace-fail '#include <map>' $'#include <map>\n#include <cstdint>'
           # Argument-dependent lookup also finds crimson::make_message.
-          # The MDS server needs the ceph intrusive-pointer factory.
-          substituteInPlace src/mds/Server.cc \
-            --replace-fail 'make_message<MClientReply>' 'ceph::make_message<MClientReply>'
+          # All classic MDS sources need the ceph intrusive-pointer factory.
+          # Preserve calls that already specify a namespace.
+          find src/mds -type f \( -name '*.cc' -o -name '*.h' \) \
+            -exec sed -i -E \
+              's/(^|[^[:alnum:]_:])make_message</\1ceph::make_message</g' {} +
         '';
       });
       # Keep ONNX Runtime's CUDA backend without the optional multi-gigabyte
