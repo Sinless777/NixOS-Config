@@ -98,6 +98,12 @@
           find src/mds -type f \( -name '*.cc' -o -name '*.h' \) \
             -exec sed -i -E \
               's/(^|[^[:alnum:]_:])make_message</\1ceph::make_message</g' {} +
+          # rgw_rest.cc in rgw_common calls a Swift handler defined in rgw_a.
+          # Declare the reverse edge so CMake repeats the mutually dependent
+          # static archives instead of leaving that handler unresolved.
+          substituteInPlace src/rgw/CMakeLists.txt \
+            --replace-fail 'set(rgw_libs rgw_a)' \
+              $'target_link_libraries(rgw_common PRIVATE rgw_a)\nset(rgw_libs rgw_a)'
         '';
       });
       # Keep ONNX Runtime's CUDA backend without the optional multi-gigabyte
