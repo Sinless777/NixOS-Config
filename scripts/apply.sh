@@ -6,7 +6,7 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 HOST="${HOST:-desktop}"
 ACTION="switch"
 DRY_RUN=0
-BUILD_MAX_JOBS="${BUILD_MAX_JOBS:-1}"
+BUILD_MAX_JOBS="${BUILD_MAX_JOBS:-2}"
 BUILD_CORES="${BUILD_CORES:-4}"
 
 usage() {
