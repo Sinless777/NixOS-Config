@@ -133,12 +133,15 @@
       # Keep ONNX Runtime's CUDA backend without the optional multi-gigabyte
       # TensorRT distribution downloaded from NVIDIA.
       onnxruntime = (prev.onnxruntime.override { tensorrtSupport = false; }).overrideAttrs (old: {
-        # FindCUDAToolkit searches nvcc's root, but cuRAND has split outputs.
+        # FindCUDAToolkit searches nvcc's root; CUDA libraries have split outputs.
         cmakeFlags = (old.cmakeFlags or [ ]) ++ [
           (lib.cmakeFeature "CUDA_curand_LIBRARY" "${lib.getLib final.cudaPackages.libcurand}/lib/libcurand.so")
+          (lib.cmakeFeature "CUDA_nvrtc_LIBRARY" "${lib.getLib final.cudaPackages.cuda_nvrtc}/lib/libnvrtc.so")
         ];
         buildInputs = (old.buildInputs or [ ]) ++ [
           (lib.getOutput "include" final.cudaPackages.libcurand)
+          final.cudaPackages.cuda_nvrtc
+          (lib.getOutput "include" final.cudaPackages.cuda_nvrtc)
         ];
       });
       suitesparse = prev.suitesparse.overrideAttrs (old: {
