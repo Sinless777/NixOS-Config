@@ -87,6 +87,30 @@
 
   nixpkgs.overlays = [
     (final: prev: {
+      pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
+        (_pythonFinal: pythonPrev: {
+          torch = pythonPrev.torch.overrideAttrs (old: {
+            # CUDA libraries and headers live outside nvcc's toolkit root.
+            # Use Torch's own toolkit so this also follows scoped overrides.
+            # setup.py invokes CMake itself and does not forward cmakeFlags.
+            postPatch =
+              (old.postPatch or "")
+              + lib.optionalString pythonPrev.torch.cudaSupport ''
+                substituteInPlace cmake/public/cuda.cmake \
+                  --replace-fail 'find_package(CUDAToolkit REQUIRED)' \
+                    'set(CUDA_curand_LIBRARY "${lib.getLib pythonPrev.torch.cudaPackages.libcurand}/lib/libcurand.so" CACHE FILEPATH "" FORCE)
+                set(CUDA_nvrtc_LIBRARY "${lib.getLib pythonPrev.torch.cudaPackages.cuda_nvrtc}/lib/libnvrtc.so" CACHE FILEPATH "" FORCE)
+                find_package(CUDAToolkit REQUIRED)'
+              '';
+            buildInputs =
+              (old.buildInputs or [ ])
+              ++ lib.optionals pythonPrev.torch.cudaSupport [
+                (lib.getOutput "include" pythonPrev.torch.cudaPackages.libcurand)
+                (lib.getOutput "include" pythonPrev.torch.cudaPackages.cuda_nvrtc)
+              ];
+          });
+        })
+      ];
       ceph = prev.ceph.overrideAttrs (old: {
         # GCC 16 no longer provides uint64_t through unrelated STL headers.
         postPatch = (old.postPatch or "") + ''
@@ -99,17 +123,24 @@
             -exec sed -i -E \
               's/(^|[^[:alnum:]_:])make_message</\1ceph::make_message</g' {} +
           # rgw_rest.cc in rgw_common calls a Swift handler defined in rgw_a.
-          # Declare the reverse edge so CMake repeats the mutually dependent
-          # static archives instead of leaving that handler unresolved. Keep
-          # rgw_a's CLS_CLIENT_HIDE_IOCTX definition out of rgw_common.
+          # Rescan the complete archive cycle without a reverse target edge,
+          # which propagates rgw_a's CLS_CLIENT_HIDE_IOCTX into rgw_common.
           substituteInPlace src/rgw/CMakeLists.txt \
             --replace-fail 'set(rgw_libs rgw_a)' \
-              $'cmake_policy(SET CMP0131 NEW)\ntarget_link_libraries(rgw_common PRIVATE "$<LINK_ONLY:rgw_a>")\nset(rgw_libs rgw_a)'
+              $'if(WITH_RADOSGW_DBSTORE)\n  set(rgw_libs "$<LINK_GROUP:RESCAN,rgw_a,rgw_common,dbstore,dbstore_lib,sqlite_db>")\nelse()\n  set(rgw_libs "$<LINK_GROUP:RESCAN,rgw_a,rgw_common>")\nendif()'
         '';
       });
       # Keep ONNX Runtime's CUDA backend without the optional multi-gigabyte
       # TensorRT distribution downloaded from NVIDIA.
-      onnxruntime = prev.onnxruntime.override { tensorrtSupport = false; };
+      onnxruntime = (prev.onnxruntime.override { tensorrtSupport = false; }).overrideAttrs (old: {
+        # FindCUDAToolkit searches nvcc's root, but cuRAND has split outputs.
+        cmakeFlags = (old.cmakeFlags or [ ]) ++ [
+          (lib.cmakeFeature "CUDA_curand_LIBRARY" "${lib.getLib final.cudaPackages.libcurand}/lib/libcurand.so")
+        ];
+        buildInputs = (old.buildInputs or [ ]) ++ [
+          (lib.getOutput "include" final.cudaPackages.libcurand)
+        ];
+      });
       suitesparse = prev.suitesparse.overrideAttrs (old: {
         # CUDA libraries have separate Nix outputs, outside nvcc's toolkit root.
         cmakeFlags = (old.cmakeFlags or [ ]) ++ [
