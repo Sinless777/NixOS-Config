@@ -6,12 +6,13 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 HOST="${HOST:-desktop}"
 ACTION="switch"
 DRY_RUN=0
-BUILD_MAX_JOBS="${BUILD_MAX_JOBS:-2}"
+NO_REEXEC=0
+BUILD_MAX_JOBS="${BUILD_MAX_JOBS:-4}"
 BUILD_CORES="${BUILD_CORES:-4}"
 
 usage() {
   cat <<'EOF'
-Usage: ./scripts/apply.sh [switch|test|boot|build] [--host HOST] [--dry-run]
+Usage: ./scripts/apply.sh [switch|test|boot|build] [--host HOST] [--dry-run] [--no-reexec]
 
   switch     Build, activate, and make the configuration the boot default.
   test       Build and activate without changing the boot default.
@@ -19,6 +20,7 @@ Usage: ./scripts/apply.sh [switch|test|boot|build] [--host HOST] [--dry-run]
   build      Build without activating; creates result in the repository.
   --host     Select the flake host (default: HOST environment variable or desktop).
   --dry-run  Print the command without building or activating anything.
+  --no-reexec Use the installed rebuild tool for compatibility during upgrades.
   --help     Show this help.
 
 Build limits default to one job and four cores per job. Override through
@@ -57,6 +59,10 @@ while (( $# > 0 )); do
       DRY_RUN=1
       shift
       ;;
+    --no-reexec)
+      NO_REEXEC=1
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -75,6 +81,10 @@ done
 cd "${REPO_ROOT}"
 command_args=(nixos-rebuild "${ACTION}" --flake "path:${REPO_ROOT}#${HOST}" --show-trace
   --max-jobs "${BUILD_MAX_JOBS}" --cores "${BUILD_CORES}")
+
+if (( NO_REEXEC )); then
+  command_args+=(--no-reexec)
+fi
 
 if [[ "${ACTION}" != build ]] && (( EUID != 0 )); then
   command_args=(sudo "${command_args[@]}")

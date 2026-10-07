@@ -180,7 +180,8 @@
 
       "workbench.preferredDarkColorTheme" = "Default Dark Modern";
 
-      "window.autoDetectColorScheme" = true;
+      # Keep the dark theme even when the desktop uses a light color scheme.
+      "window.autoDetectColorScheme" = false;
 
       "workbench.startupEditor" = "none";
 

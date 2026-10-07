@@ -116,18 +116,12 @@
   # SSH signing verification
   # ---------------------------------------------------------------------------
   #
-  # Replace REPLACE_WITH_PUBLIC_KEY with the contents of:
-  #
-  #   ~/.ssh/id_ed25519.pub
-  #
-  # Example:
-  #
-  #   ssh-ed25519 AAAAC3... tpierce@sinlessindustries.com
+  # Public signing key; the private key stays in ~/.ssh outside the Nix store.
   #
 
   home.file.".config/git/allowed_signers" = {
     text = ''
-      tpierce@sinlessindustries.com ssh-ed25519 REPLACE_WITH_PUBLIC_KEY
+      tpierce@sinlessindustries.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILJb2uz6yj53cyEMGkG9ZrzLx718DRtOSDQY21nMEFt0
     '';
 
     # This contains public keys and is linked from the read-only Nix store.

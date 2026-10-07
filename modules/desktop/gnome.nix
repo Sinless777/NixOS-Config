@@ -7,6 +7,9 @@
 
   services.desktopManager.gnome.enable = true;
 
+  # Generate caches for the merged application icon themes on Wayland too.
+  gtk.iconCache.enable = true;
+
   # ---------------------------------------------------------------------------
   # GDM Display Manager
   # ---------------------------------------------------------------------------
