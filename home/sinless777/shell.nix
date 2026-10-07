@@ -213,57 +213,107 @@
 
     enableZshIntegration = true;
 
-    # Nerd Font symbols work with your FiraCode Nerd Font setup.
+    # Nerd Font icons.
     presets = [
       "nerd-font-symbols"
     ];
 
     settings = {
+      # -----------------------------------------------------------------------
+      # General
+      # -----------------------------------------------------------------------
+
       add_newline = true;
 
-      # -----------------------------------------------------------------------
-      # Prompt format
-      # -----------------------------------------------------------------------
-
-      format = ''
-        $username\
-        $hostname\
-        $directory\
-        $git_branch\
-        $git_status\
-        $git_state\
-        $git_metrics\
-        $package\
-        $nodejs\
-        $python\
-        $golang\
-        $rust\
-        $dotnet\
-        $c\
-        $cmake\
-        $docker_context\
-        $kubernetes\
-        $terraform\
-        $aws\
-        $azure\
-        $gcloud\
-        $nix_shell\
-        $cmd_duration\
-        $line_break\
-        $character
-      '';
+      scan_timeout = 30;
+      command_timeout = 1000;
 
       # -----------------------------------------------------------------------
-      # User / host
+      # Prompt layout
+      # -----------------------------------------------------------------------
+      #
+      # Line 1:
+      #
+      #   user@host  directory  git  package/languages  infra/cloud
+      #
+      # Line 2:
+      #
+      #   nix shell  jobs  duration  status
+      #   ❯
+      #
+      # Modules automatically disappear when they are not relevant.
+      #
+
+      format =
+        "$os$username$hostname$directory"
+        + "$git_branch$git_commit$git_status$git_state$git_metrics"
+        + "$fill"
+        + "$package"
+        + "$nodejs$python$golang$rust$dotnet$c$cmake"
+        + "$docker_context$kubernetes$terraform"
+        + "$aws$azure$gcloud"
+        + "$nix_shell"
+        + "$line_break"
+        + "$jobs$status$cmd_duration"
+        + "$character";
+
+      # -----------------------------------------------------------------------
+      # Right prompt
+      # -----------------------------------------------------------------------
+      #
+      # Time is useful, but keeping it on the right avoids cluttering the
+      # primary prompt.
+      #
+
+      right_format = "$memory_usage$time";
+
+      # -----------------------------------------------------------------------
+      # OS
+      # -----------------------------------------------------------------------
+
+      os = {
+        disabled = false;
+
+        format = "[$symbol]($style) ";
+
+        style = "bold blue";
+
+        symbols = {
+          NixOS = "";
+          Linux = "";
+          Ubuntu = "";
+          Debian = "";
+          Fedora = "";
+          Arch = "";
+          Windows = "󰍲";
+          Macos = "";
+        };
+      };
+
+      # -----------------------------------------------------------------------
+      # User
       # -----------------------------------------------------------------------
 
       username = {
         show_always = true;
+
+        style_user = "bold green";
+        style_root = "bold red";
+
         format = "[$user]($style)";
       };
 
+      # -----------------------------------------------------------------------
+      # Hostname
+      # -----------------------------------------------------------------------
+
       hostname = {
         ssh_only = false;
+
+        trim_at = ".";
+
+        style = "bold cyan";
+
         format = "[@$hostname]($style) ";
       };
 
@@ -273,80 +323,332 @@
 
       directory = {
         truncation_length = 5;
+        truncation_symbol = "…/";
+
         truncate_to_repo = false;
+
         read_only = " 󰌾";
+
+        style = "bold blue";
+
+        format = "[ $path]($style)[$read_only]($read_only_style) ";
+
+        substitutions = {
+          "Documents" = "󰈙";
+          "Downloads" = "";
+          "Music" = "";
+          "Pictures" = "";
+          "Projects" = "󰲋";
+          "Infrastructure" = "󰒋";
+          "Aerealith" = "󰚩";
+        };
       };
 
       # -----------------------------------------------------------------------
-      # Git
+      # Git branch
       # -----------------------------------------------------------------------
 
       git_branch = {
         symbol = " ";
-        format = "[$symbol$branch]($style) ";
-      };
 
-      git_status = {
-        format = "([$all_status$ahead_behind]($style) )";
-      };
+        style = "bold purple";
 
-      git_metrics = {
-        disabled = false;
+        format = "[$symbol$branch(:$remote_branch)]($style) ";
       };
 
       # -----------------------------------------------------------------------
-      # Language / runtime modules
+      # Git commit
+      # -----------------------------------------------------------------------
+
+      git_commit = {
+        disabled = false;
+
+        commit_hash_length = 7;
+
+        only_detached = true;
+
+        tag_disabled = false;
+
+        tag_symbol = "  ";
+
+        style = "bold yellow";
+
+        format = "[$hash$tag]($style) ";
+      };
+
+      # -----------------------------------------------------------------------
+      # Git status
+      # -----------------------------------------------------------------------
+
+      git_status = {
+        style = "bold yellow";
+
+        format = "([$all_status$ahead_behind]($style) )";
+
+        conflicted = "󰞇$count ";
+        ahead = "⇡$count ";
+        behind = "⇣$count ";
+        diverged = "⇕⇡$ahead_count⇣$behind_count ";
+
+        up_to_date = "✓ ";
+
+        untracked = "?$count ";
+        stashed = "󰏗$count ";
+        modified = "!$count ";
+        staged = "+$count ";
+        renamed = "»$count ";
+        deleted = "✘$count ";
+      };
+
+      # -----------------------------------------------------------------------
+      # Git operation
+      # -----------------------------------------------------------------------
+
+      git_state = {
+        style = "bold red";
+
+        format = "[$state( $progress_current/$progress_total)]($style) ";
+      };
+
+      # -----------------------------------------------------------------------
+      # Git metrics
+      # -----------------------------------------------------------------------
+
+      git_metrics = {
+        disabled = false;
+
+        added_style = "bold green";
+        deleted_style = "bold red";
+
+        format = "([+$added]($added_style) )([-$deleted]($deleted_style) )";
+      };
+
+      # -----------------------------------------------------------------------
+      # Fill
+      # -----------------------------------------------------------------------
+
+      fill = {
+        symbol = " ";
+      };
+
+      # -----------------------------------------------------------------------
+      # Package
+      # -----------------------------------------------------------------------
+
+      package = {
+        symbol = "󰏗 ";
+
+        style = "bold 208";
+
+        format = "[$symbol$version]($style) ";
+      };
+
+      # -----------------------------------------------------------------------
+      # Node.js
       # -----------------------------------------------------------------------
 
       nodejs = {
         symbol = " ";
-      };
 
-      python = {
-        symbol = " ";
-      };
+        style = "bold green";
 
-      golang = {
-        symbol = " ";
-      };
-
-      rust = {
-        symbol = " ";
-      };
-
-      dotnet = {
-        symbol = " ";
-      };
-
-      c = {
-        symbol = " ";
+        format = "[$symbol$version]($style) ";
       };
 
       # -----------------------------------------------------------------------
-      # Containers / infrastructure
+      # Python
+      # -----------------------------------------------------------------------
+
+      python = {
+        symbol = " ";
+
+        style = "bold yellow";
+
+        format = "[$symbol$version( \\($virtualenv\\))]($style) ";
+      };
+
+      # -----------------------------------------------------------------------
+      # Go
+      # -----------------------------------------------------------------------
+
+      golang = {
+        symbol = " ";
+
+        style = "bold cyan";
+
+        format = "[$symbol$version]($style) ";
+      };
+
+      # -----------------------------------------------------------------------
+      # Rust
+      # -----------------------------------------------------------------------
+
+      rust = {
+        symbol = " ";
+
+        style = "bold 208";
+
+        format = "[$symbol$version]($style) ";
+      };
+
+      # -----------------------------------------------------------------------
+      # .NET
+      # -----------------------------------------------------------------------
+
+      dotnet = {
+        symbol = "󰪮 ";
+
+        style = "bold purple";
+
+        format = "[$symbol$version]($style) ";
+      };
+
+      # -----------------------------------------------------------------------
+      # C / C++
+      # -----------------------------------------------------------------------
+
+      c = {
+        symbol = " ";
+
+        style = "bold blue";
+
+        format = "[$symbol$version]($style) ";
+      };
+
+      # -----------------------------------------------------------------------
+      # CMake
+      # -----------------------------------------------------------------------
+
+      cmake = {
+        symbol = " ";
+
+        style = "bold blue";
+
+        format = "[$symbol$version]($style) ";
+      };
+
+      # -----------------------------------------------------------------------
+      # Docker
       # -----------------------------------------------------------------------
 
       docker_context = {
         symbol = " ";
-      };
 
-      kubernetes = {
-        disabled = false;
-        symbol = "󱃾 ";
-        format = "[$symbol$context( \\($namespace\\))]($style) ";
-      };
+        style = "bold blue";
 
-      terraform = {
-        symbol = "󱁢 ";
+        only_with_files = true;
+
+        format = "[$symbol$context]($style) ";
       };
 
       # -----------------------------------------------------------------------
-      # Nix
+      # Kubernetes
+      # -----------------------------------------------------------------------
+
+      kubernetes = {
+        disabled = false;
+
+        symbol = "󱃾 ";
+
+        style = "bold cyan";
+
+        format = "[$symbol$context]($style)" + "[/$namespace](bold blue) ";
+      };
+
+      # -----------------------------------------------------------------------
+      # Terraform
+      # -----------------------------------------------------------------------
+
+      terraform = {
+        symbol = "󱁢 ";
+
+        style = "bold purple";
+
+        format = "[$symbol$workspace]($style) ";
+      };
+
+      # -----------------------------------------------------------------------
+      # AWS
+      # -----------------------------------------------------------------------
+
+      aws = {
+        symbol = "󰸏 ";
+
+        style = "bold yellow";
+
+        format = "[$symbol$profile]($style)" + "[$region](dimmed yellow) ";
+      };
+
+      # -----------------------------------------------------------------------
+      # Azure
+      # -----------------------------------------------------------------------
+
+      azure = {
+        symbol = "󰠅 ";
+
+        style = "bold blue";
+
+        format = "[$symbol$subscription]($style) ";
+      };
+
+      # -----------------------------------------------------------------------
+      # Google Cloud
+      # -----------------------------------------------------------------------
+
+      gcloud = {
+        symbol = "󱇶 ";
+
+        style = "bold blue";
+
+        format = "[$symbol$project]($style) ";
+      };
+
+      # -----------------------------------------------------------------------
+      # Nix shell
       # -----------------------------------------------------------------------
 
       nix_shell = {
         symbol = " ";
-        format = "[$symbol$state]($style) ";
+
+        style = "bold blue";
+
+        heuristic = true;
+
+        format = "[$symbol$state( \\($name\\))]($style) ";
+      };
+
+      # -----------------------------------------------------------------------
+      # Background jobs
+      # -----------------------------------------------------------------------
+
+      jobs = {
+        symbol = "󰜎 ";
+
+        number_threshold = 1;
+
+        style = "bold blue";
+
+        format = "[$symbol$number]($style) ";
+      };
+
+      # -----------------------------------------------------------------------
+      # Previous command status
+      # -----------------------------------------------------------------------
+
+      status = {
+        disabled = false;
+
+        symbol = "✘ ";
+        success_symbol = "";
+
+        not_executable_symbol = "󰂭 ";
+        not_found_symbol = "󰍉 ";
+        sigint_symbol = "󰚌 ";
+        signal_symbol = "󱐋 ";
+
+        style = "bold red";
+
+        format = "[$symbol$status]($style) ";
       };
 
       # -----------------------------------------------------------------------
@@ -354,8 +656,47 @@
       # -----------------------------------------------------------------------
 
       cmd_duration = {
-        min_time = 2000;
-        format = "[$duration]($style) ";
+        min_time = 1500;
+
+        show_milliseconds = false;
+
+        style = "bold yellow";
+
+        format = "[󱎫 $duration]($style) ";
+      };
+
+      # -----------------------------------------------------------------------
+      # Memory
+      # -----------------------------------------------------------------------
+      #
+      # Only show memory when the shell/process environment is using a
+      # meaningful amount. Keeps the right prompt clean.
+      #
+
+      memory_usage = {
+        disabled = false;
+
+        threshold = 70;
+
+        symbol = "󰍛 ";
+
+        style = "dimmed white";
+
+        format = "[$symbol$ram_pct]($style) ";
+      };
+
+      # -----------------------------------------------------------------------
+      # Time
+      # -----------------------------------------------------------------------
+
+      time = {
+        disabled = false;
+
+        time_format = "%I:%M:%S %p";
+
+        style = "dimmed white";
+
+        format = "[ $time]($style)";
       };
 
       # -----------------------------------------------------------------------
@@ -363,8 +704,9 @@
       # -----------------------------------------------------------------------
 
       character = {
-        success_symbol = "[➜](bold green)";
-        error_symbol = "[➜](bold red)";
+        success_symbol = "[╰─❯](bold green)";
+        error_symbol = "[╰─❯](bold red)";
+        vimcmd_symbol = "[╰─❮](bold yellow)";
       };
     };
   };
