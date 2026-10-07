@@ -8,6 +8,10 @@
   environment.systemPackages = with pkgs; [
     # Python interpreter
     python3
+    # Projects such as Aerealith pin Python 3.12.
+    # Exclude the separate doc derivation: its Sphinx build is broken in
+    # the pinned nixpkgs, and system documentation would pull it in.
+    (builtins.removeAttrs python312 [ "doc" ])
 
     # Modern Python package / environment tooling
     uv
@@ -43,6 +47,10 @@
   # ---------------------------------------------------------------------------
 
   environment.sessionVariables = {
+    # uv-managed generic Linux interpreters cannot run directly on NixOS.
+    UV_PYTHON_PREFERENCE = "only-system";
+    UV_PYTHON_DOWNLOADS = "never";
+
     # Keep Python user installs in the user's home directory.
     PYTHONUSERBASE = "$HOME/.local";
 

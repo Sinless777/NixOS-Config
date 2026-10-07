@@ -124,6 +124,24 @@
     # -------------------------------------------------------------------------
 
     initContent = ''
+      # Refresh these on every interactive shell startup. Home Manager's
+      # session-variable guard can otherwise retain values from before a rebuild.
+      export PNPM_CONFIG_PM_ON_FAIL=warn
+      export NPM_CONFIG_MANAGE_PACKAGE_MANAGER_VERSIONS=false
+      export UV_PYTHON_PREFERENCE=only-system
+      export UV_PYTHON_DOWNLOADS=never
+
+      # Use Nix's pnpm even when a user-installed shim precedes it in PATH.
+      # Set the policy per invocation so project shell hooks cannot reset it.
+      unalias pnpm 2>/dev/null || true
+      function pnpm {
+        PNPM_CONFIG_PM_ON_FAIL=warn \
+        NPM_CONFIG_MANAGE_PACKAGE_MANAGER_VERSIONS=false \
+        UV_PYTHON_PREFERENCE=only-system \
+        UV_PYTHON_DOWNLOADS=never \
+          ${pkgs.pnpm}/bin/pnpm "$@"
+      }
+
       # -----------------------------------------------------------------------
       # Basic Zsh behavior
       # -----------------------------------------------------------------------
