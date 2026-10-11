@@ -1,71 +1,191 @@
-{ lib, ... }:
+# =====================================================================
+# SinLess Industries — Swap Management
+# =====================================================================
+#
+# Workstation defaults:
+#   - Prefer compressed zram swap
+#   - Preserve existing /dev/sdf3 disk swap defined in disks.nix
+#   - Never create swap on Ceph OSD disks
+#
+# The disk swap option is disabled by default to prevent defining
+# the same swap partition twice.
+#
+# =====================================================================
 
 {
-  # ---------------------------------------------------------------------------
-  # Swap
-  # ---------------------------------------------------------------------------
-  #
-  # The actual swap partition should be declared in the host-specific
-  # hardware/storage configuration, usually:
-  #
-  #   hosts/<hostname>/hardware-configuration.nix
-  #
-  # or:
-  #
-  #   hosts/<hostname>/disks.nix
-  #
-  # Example:
-  #
-  # swapDevices = [
-  #   {
-  #     device = "/dev/disk/by-uuid/<swap-uuid>";
-  #   }
-  # ];
-  #
-  # This reusable module controls swap behavior rather than hardcoding a
-  # machine-specific device.
-  #
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
-  # ---------------------------------------------------------------------------
-  # Swappiness
-  # ---------------------------------------------------------------------------
+let
+  inherit (lib)
+    mkEnableOption
+    mkIf
+    mkOption
+    optional
+    optionals
+    types
+    ;
 
-  boot.kernel.sysctl = {
-    # With ~125 GiB RAM, prefer keeping active pages in memory and only use
-    # disk-backed swap when it is genuinely useful.
-    "vm.swappiness" = 10;
+  cfg = config.sinless.storage.swap;
 
-    # Encourage reclaiming filesystem metadata caches less aggressively.
-    "vm.vfs_cache_pressure" = 50;
+  # Existing desktop swap partition (sdf3). Do not use /dev/sdf3:
+  # Linux drive letters may change between boots.
+  defaultSwapDevice = "/dev/disk/by-partuuid/f796b385-e682-4add-abf7-5d392141ab46";
+in
+{
+  options.sinless.storage.swap = {
+    enable = mkEnableOption "workstation swap management";
 
-    # Avoid reserving excessive free memory.
-    "vm.min_free_kbytes" = 262144;
+    zram = {
+      enable = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Enable compressed zram swap.";
+      };
+
+      algorithm = mkOption {
+        type = types.enum [
+          "zstd"
+          "lz4"
+          "lzo"
+          "lzo-rle"
+        ];
+        default = "zstd";
+        description = "Compression algorithm for zram swap.";
+      };
+
+      memoryPercent = mkOption {
+        type = types.ints.between 1 100;
+        default = 10;
+        description = "Logical zram capacity as a percentage of RAM.";
+      };
+
+      priority = mkOption {
+        type = types.int;
+        default = 100;
+        description = "Swap priority for zram (higher is preferred).";
+      };
+    };
+
+    disk = {
+      enable = mkEnableOption "disk swap declaration in this module";
+
+      device = mkOption {
+        type = types.str;
+        default = defaultSwapDevice;
+        description = ''
+          Existing desktop disk-swap partition, identified by PARTUUID.
+          Do not enable here when disks.nix already defines it.
+        '';
+      };
+
+      priority = mkOption {
+        type = types.int;
+        default = 10;
+        description = "Swap priority of the optional disk swap.";
+      };
+
+      discard = mkOption {
+        type = types.nullOr (
+          types.enum [
+            "once"
+            "pages"
+            "both"
+          ]
+        );
+        default = null;
+        description = "Optional discard policy; null disables discard.";
+      };
+    };
+
+    memory = {
+      configure = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Enable swap-related kernel VM tuning.";
+      };
+
+      swappiness = mkOption {
+        type = types.ints.between 0 200;
+        default = 100;
+        description = "Kernel vm.swappiness value.";
+      };
+
+      pageCluster = mkOption {
+        type = types.ints.between 0 31;
+        default = 0;
+        description = "Kernel vm.page-cluster read-ahead exponent.";
+      };
+
+      vfsCachePressure = mkOption {
+        # Nixpkgs does NOT provide lib.types.positive.
+        type = types.ints.between 1 10000;
+        default = 100;
+        description = "Kernel vm.vfs_cache_pressure (must be positive).";
+      };
+    };
+
+    diagnostics.enable = mkOption {
+      type = types.bool;
+      default = true;
+      description = "Install utilities for inspecting memory and swap.";
+    };
   };
 
-  # ---------------------------------------------------------------------------
-  # zram
-  # ---------------------------------------------------------------------------
-  #
-  # A small compressed RAM swap device can absorb short memory-pressure
-  # spikes before the system needs to touch the physical swap partition.
-  #
-  # This is particularly useful for development workloads, browsers,
-  # containers, builds, and occasional ML jobs.
-  #
+  config = mkIf cfg.enable {
+    assertions = [
+      {
+        assertion = !cfg.zram.enable || !cfg.disk.enable || cfg.zram.priority > cfg.disk.priority;
+        message = "sinless.storage.swap.zram.priority must exceed disk.priority.";
+      }
+      {
+        assertion = !cfg.disk.enable || cfg.disk.device == defaultSwapDevice;
+        message = ''
+          This desktop module permits disk swap only on the existing
+          sdf3 partition (identified by PARTUUID). Leave disk.enable=false
+          when hosts/desktop/disks.nix owns disk swap.
+        '';
+      }
+    ];
 
-  zramSwap = {
-    enable = true;
+    zramSwap = {
+      enable = cfg.zram.enable;
+      algorithm = cfg.zram.algorithm;
+      memoryPercent = cfg.zram.memoryPercent;
+      priority = cfg.zram.priority;
+    };
 
-    # Percentage of physical memory allocated as the maximum zram device.
-    #
-    # With ~125 GiB RAM, 10% provides roughly 12 GiB of compressed swap
-    # capacity without being excessive.
-    memoryPercent = 10;
+    # Leave this disabled in the desktop host configuration:
+    # hosts/desktop/disks.nix already declares sdf3 with priority 10.
+    swapDevices = optional cfg.disk.enable (
+      {
+        device = cfg.disk.device;
+        priority = cfg.disk.priority;
+        randomEncryption.enable = false;
+      }
+      // lib.optionalAttrs (cfg.disk.discard != null) {
+        discardPolicy = cfg.disk.discard;
+      }
+    );
 
-    # zstd offers good compression, though lz4 is generally faster.
-    algorithm = "zstd";
+    boot.kernel.sysctl = mkIf cfg.memory.configure {
+      "vm.swappiness" = cfg.memory.swappiness;
+      "vm.page-cluster" = cfg.memory.pageCluster;
+      "vm.vfs_cache_pressure" = cfg.memory.vfsCachePressure;
+    };
 
-    # Prefer zram before physical disk swap.
-    priority = 100;
+    environment.systemPackages = optionals cfg.diagnostics.enable (
+      with pkgs;
+      [
+        util-linux
+        procps
+        sysstat
+        htop
+        btop
+      ]
+    );
   };
 }
