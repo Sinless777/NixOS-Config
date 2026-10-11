@@ -250,7 +250,7 @@
     deployDaemons = true;
 
     # Set this after generating the cluster UUID.
-    fsid = "n375782ec-bc1a-47c4-856c-8d5f3dad5c26";
+    fsid = "375782ec-bc1a-47c4-856c-8d5f3dad5c26";
 
     monitorId = "desktop";
     managerId = "desktop";
@@ -263,7 +263,13 @@
     clusterNetwork = null;
 
     # OSDs have not been provisioned.
-    osdIds = [ ];
+    osdIds = [
+      "0" # SanDisk Optimus 5100 — 1 TB
+      "1" # WD PC SN5000S — 512 GB
+      "2" # Seagate ST3500414CS — 500 GB HDD
+      "3" # Samsung PM830 — 256 GB SSD
+      "4" # Samsung MZVLW128HEGR — 128 GB NVMe
+    ];
 
     enableMds = false;
     openFirewall = false;
